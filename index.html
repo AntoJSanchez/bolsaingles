@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pronóstico Interactivo Bolsa Inglés Andalucía 2025-26</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #EBE0FF;
+            color: #3A005C;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            height: 300px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+        .result-card {
+            background: linear-gradient(135deg, #8B6BAA, #5A008A);
+            border: none;
+        }
+        .card {
+            background-color: white;
+            border-radius: 1.5rem;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            padding: 1.5rem;
+        }
+        @media (min-width: 768px) {
+            .card {
+                padding: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <main class="container mx-auto p-4 md:p-8 max-w-7xl">
+
+        <header class="text-center mb-12">
+            <h1 class="text-3xl md:text-5xl font-extrabold text-[#3A005C] mb-3">Pronóstico Personalizado para Aspirantes</h1>
+            <p class="text-lg text-[#5A008A]">Bolsa de Inglés - Andalucía 2025/26</p>
+        </header>
+
+        <div class="card mb-8">
+            <h2 class="text-2xl font-bold text-[#5A008A] mb-6">Introduce tus datos para la simulación</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="space-y-4">
+                    <div>
+                        <label for="bolsaPos" class="block text-sm font-medium text-gray-700">Tu posición en bolsa</label>
+                        <input type="number" id="bolsaPos" value="1200" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#7A5BAA] focus:ring-[#7A5BAA] sm:text-sm p-2">
+                    </div>
+                    <div>
+                        <label for="vacantesAgosto" class="block text-sm font-medium text-gray-700">Vacantes informatizadas (Agosto)</label>
+                        <input type="number" id="vacantesAgosto" value="571" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#7A5BAA] focus:ring-[#7A5BAA] sm:text-sm p-2">
+                    </div>
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Provincias seleccionadas</label>
+                    <div id="provinciasContainer" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    </div>
+                </div>
+            </div>
+            <div id="errorBlock" class="hidden text-center mt-4 p-3 rounded-lg bg-red-100 text-red-700"></div>
+            <div class="mt-6 text-center">
+                <button id="calculateBtn" class="bg-[#5A008A] hover:bg-[#3A005C] text-white font-bold py-2 px-6 rounded-lg transition-colors">
+                    Calcular Pronóstico
+                </button>
+            </div>
+        </div>
+
+        <div id="resultsBlock" class="hidden">
+             <div id="resultText" class="text-center mb-8 p-6 rounded-2xl shadow-lg text-white result-card">
+             </div>
+             <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                 <div class="card">
+                     <h3 class="text-xl font-bold text-[#5A008A] mb-4 text-center">Evolución de la Bolsa</h3>
+                     <div class="chart-container">
+                         <canvas id="cumulativeChart"></canvas>
+                     </div>
+                      <p class="text-xs text-center text-gray-500 mt-4">La línea morada clara muestra el avance general estimado. La línea discontinua es tu posición. El cruce indica tu posible llamada.</p>
+                 </div>
+                 <div class="card">
+                     <h3 class="text-xl font-bold text-[#5A008A] mb-4 text-center">Llamamientos por Mes</h3>
+                     <div class="chart-container">
+                         <canvas id="monthlyCallsChart"></canvas>
+                     </div>
+                     <p class="text-xs text-center text-gray-500 mt-4">La barra morada oscura resalta tu mes de llamamiento más probable.</p>
+                 </div>
+             </div>
+        </div>
+
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const PROVINCIAS = {
+                'Almería': { poblacion: 753000, demandFactor: 1.2, checked: true },
+                'Málaga': { poblacion: 1750000, demandFactor: 1.2, checked: true },
+                'Granada': { poblacion: 930000, demandFactor: 0.95, checked: true },
+                'Huelva': { poblacion: 530000, demandFactor: 0.9, checked: true },
+                'Sevilla': { poblacion: 1960000, demandFactor: 0.85, checked: true },
+                'Jaén': { poblacion: 620000, demandFactor: 0.8, checked: true },
+                'Córdoba': { poblacion: 775000, demandFactor: 0.8, checked: true },
+                'Cádiz': { poblacion: 1250000, demandFactor: 0.75, checked: true }
+            };
+
+            const TOTAL_WEIGHTED_DEMAND = Object.values(PROVINCIAS).reduce((sum, p) => sum + (p.poblacion * p.demandFactor), 0);
+            
+            const LLAMAMIENTOS_MENSUALES = {
+                'Sept': 475, 'Oct': 100, 'Nov': 90, 'Dic': 3.5,
+                'Ene': 105, 'Feb': 35, 'Mar': 35, 'Abr': 25,
+                'May': 25, 'Jun': 3.5
+            };
+            const MESES = Object.keys(LLAMAMIENTOS_MENSUALES);
+            
+            const CALENDARIO_SIPRI = [
+                { mes: 'Sept', dia: 'Jueves 4', incorporacion: 'Miércoles 10 Sep' }, { mes: 'Sept', dia: 'Martes 9', incorporacion: 'Lunes 15 Sep' }, { mes: 'Sept', dia: 'Jueves 11', incorporacion: 'Miércoles 17 Sep' }, { mes: 'Sept', dia: 'Martes 16', incorporacion: 'Lunes 22 Sep' }, { mes: 'Sept', dia: 'Jueves 18', incorporacion: 'Miércoles 24 Sep' }, { mes: 'Sept', dia: 'Martes 23', incorporacion: 'Lunes 29 Sep' }, { mes: 'Sept', dia: 'Jueves 25', incorporacion: 'Miércoles 1 Oct' }, { mes: 'Sept', dia: 'Martes 30', incorporacion: 'Lunes 6 Oct' },
+                { mes: 'Oct', dia: 'Jueves 2', incorporacion: 'Miércoles 8 Oct' }, { mes: 'Oct', dia: 'Martes 7', incorporacion: 'Martes 14 Oct' }, { mes: 'Oct', dia: 'Jueves 9', incorporacion: 'Miércoles 15 Oct' }, { mes: 'Oct', dia: 'Martes 14', incorporacion: 'Lunes 20 Oct' }, { mes: 'Oct', dia: 'Jueves 16', incorporacion: 'Miércoles 22 Oct' }, { mes: 'Oct', dia: 'Martes 21', incorporacion: 'Lunes 27 Oct' }, { mes: 'Oct', dia: 'Jueves 23', incorporacion: 'Miércoles 29 Oct' }, { mes: 'Oct', dia: 'Martes 28', incorporacion: 'Lunes 3 Nov' }, { mes: 'Oct', dia: 'Jueves 30', incorporacion: 'Miércoles 5 Nov' },
+                { mes: 'Nov', dia: 'Martes 4', incorporacion: 'Lunes 10 Nov' }, { mes: 'Nov', dia: 'Jueves 6', incorporacion: 'Miércoles 12 Nov' }, { mes: 'Nov', dia: 'Martes 11', incorporacion: 'Lunes 17 Nov' }, { mes: 'Nov', dia: 'Jueves 13', incorporacion: 'Miércoles 19 Nov' }, { mes: 'Nov', dia: 'Martes 18', incorporacion: 'Lunes 24 Nov' }, { mes: 'Nov', dia: 'Jueves 20', incorporacion: 'Miércoles 26 Nov' }, { mes: 'Nov', dia: 'Martes 25', incorporacion: 'Lunes 1 Dic' }, { mes: 'Nov', dia: 'Jueves 27', incorporacion: 'Miércoles 3 Dic' },
+                { mes: 'Dic', dia: 'Martes 2', incorporacion: 'Martes 9 Dic' }, { mes: 'Dic', dia: 'Jueves 4', incorporacion: 'Miércoles 10 Dic' }, { mes: 'Dic', dia: 'Martes 9', incorporacion: 'Lunes 15 Dic' }, { mes: 'Dic', dia: 'Jueves 11', incorporacion: 'Miércoles 17 Dic' },
+                { mes: 'Ene', dia: 'Jueves 8', incorporacion: 'Miércoles 14 Ene' }, { mes: 'Ene', dia: 'Martes 13', incorporacion: 'Lunes 19 Ene' }, { mes: 'Ene', dia: 'Jueves 15', incorporacion: 'Miércoles 21 Ene' }, { mes: 'Ene', dia: 'Martes 20', incorporacion: 'Lunes 26 Ene' }, { mes: 'Ene', dia: 'Jueves 22', incorporacion: 'Miércoles 28 Ene' }, { mes: 'Ene', dia: 'Martes 27', incorporacion: 'Lunes 2 Feb' }, { mes: 'Ene', dia: 'Jueves 29', incorporacion: 'Miércoles 4 Feb' },
+                { mes: 'Feb', dia: 'Martes 3', incorporacion: 'Lunes 9 Feb' }, { mes: 'Feb', dia: 'Jueves 5', incorporacion: 'Miércoles 11 Feb' }, { mes: 'Feb', dia: 'Martes 10', incorporacion: 'Lunes 16 Feb' }, { mes: 'Feb', dia: 'Jueves 12', incorporacion: 'Miércoles 18 Feb' }, { mes: 'Feb', dia: 'Martes 17', incorporacion: 'Lunes 23 Feb' }, { mes: 'Feb', dia: 'Jueves 19', incorporacion: 'Miércoles 25 Feb' }, { mes: 'Feb', dia: 'Martes 24', incorporacion: 'Lunes 2 Mar' }, { mes: 'Feb', dia: 'Jueves 26', incorporacion: 'Miércoles 4 Mar' },
+                { mes: 'Mar', dia: 'Martes 3', incorporacion: 'Lunes 9 Mar' }, { mes: 'Mar', dia: 'Jueves 5', incorporacion: 'Miércoles 11 Mar' }, { mes: 'Mar', dia: 'Martes 10', incorporacion: 'Lunes 16 Mar' }, { mes: 'Mar', dia: 'Jueves 12', incorporacion: 'Miércoles 18 Mar' }, { mes: 'Mar', dia: 'Martes 17', incorporacion: 'Lunes 23 Mar' }, { mes: 'Mar', dia: 'Jueves 19', incorporacion: 'Miércoles 25 Mar' }, { mes: 'Mar', dia: 'Martes 24', incorporacion: 'Lunes 6 Abr' },
+                { mes: 'Abr', dia: 'Martes 7', incorporacion: 'Lunes 13 Abr' }, { mes: 'Abr', dia: 'Jueves 9', incorporacion: 'Miércoles 15 Abr' }, { mes: 'Abr', dia: 'Martes 14', incorporacion: 'Lunes 20 Abr' }, { mes: 'Abr', dia: 'Jueves 16', incorporacion: 'Miércoles 22 Abr' }, { mes: 'Abr', dia: 'Martes 21', incorporacion: 'Lunes 27 Abr' }, { mes: 'Abr', dia: 'Jueves 23', incorporacion: 'Miércoles 29 Abr' }, { mes: 'Abr', dia: 'Martes 28', incorporacion: 'Lunes 4 May' }, { mes: 'Abr', dia: 'Jueves 30', incorporacion: 'Miércoles 6 May' },
+                { mes: 'May', dia: 'Martes 5', incorporacion: 'Lunes 11 May' }, { mes: 'May', dia: 'Jueves 7', incorporacion: 'Miércoles 13 May' }, { mes: 'May', dia: 'Martes 12', incorporacion: 'Lunes 18 May' }, { mes: 'May', dia: 'Jueves 14', incorporacion: 'Miércoles 20 May' }, { mes: 'May', dia: 'Martes 19', incorporacion: 'Lunes 25 May' }, { mes: 'May', dia: 'Jueves 21', incorporacion: 'Miércoles 27 May' }, { mes: 'May', dia: 'Martes 26', incorporacion: 'Lunes 1 Jun' }, { mes: 'May', dia: 'Jueves 28', incorporacion: 'Miércoles 3 Jun' },
+                { mes: 'Jun', dia: 'Martes 2', incorporacion: 'Lunes 8 Jun' }, { mes: 'Jun', dia: 'Jueves 4', incorporacion: 'Miércoles 10 Jun' },
+            ];
+
+            let cumulativeChart, monthlyCallsChart;
+
+            function setupProvincias() {
+                const container = document.getElementById('provinciasContainer');
+                Object.keys(PROVINCIAS).forEach(nombre => {
+                    const div = document.createElement('div');
+                    div.className = 'flex items-center';
+                    const input = document.createElement('input');
+                    input.type = 'checkbox';
+                    input.id = `prov-${nombre}`;
+                    input.name = nombre;
+                    input.checked = PROVINCIAS[nombre].checked;
+                    input.className = 'h-4 w-4 rounded border-gray-300 text-[#6A0DAD] focus:ring-[#6A0DAD]';
+                    div.appendChild(input);
+                    const label = document.createElement('label');
+                    label.htmlFor = `prov-${nombre}`;
+                    label.textContent = nombre;
+                    label.className = 'ml-2 block text-sm text-gray-700 cursor-pointer';
+                    div.appendChild(label);
+                    container.appendChild(div);
+                });
+            }
+
+            function getChartOptions(yAxisTitle) {
+                return {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: true, position: 'bottom', labels: { color: '#3A005C' } },
+                        tooltip: {
+                            callbacks: {
+                                title: function(tooltipItems) {
+                                    const item = tooltipItems[0];
+                                    let label = item.chart.data.labels[item.dataIndex];
+                                    return Array.isArray(label) ? label.join(' ') : label;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: { 
+                            beginAtZero: true, 
+                            title: { display: true, text: yAxisTitle, color: '#5A008A' },
+                            ticks: { color: '#3A005C' }
+                        },
+                        x: { 
+                            ticks: { color: '#3A005C' } 
+                        }
+                    }
+                };
+            }
+
+            function createCharts() {
+                cumulativeChart = new Chart(document.getElementById('cumulativeChart').getContext('2d'), {
+                    type: 'line', data: { labels: MESES, datasets: [] }, options: getChartOptions('Posición en bolsa')
+                });
+                monthlyCallsChart = new Chart(document.getElementById('monthlyCallsChart').getContext('2d'), {
+                    type: 'bar', data: { labels: MESES, datasets: [] }, options: getChartOptions('Nº de llamamientos')
+                });
+            }
+
+            function runCalculation() {
+                const errorBlock = document.getElementById('errorBlock');
+                errorBlock.classList.add('hidden');
+
+                const posicion = parseInt(document.getElementById('bolsaPos').value);
+                const vacantes = parseInt(document.getElementById('vacantesAgosto').value);
+                
+                const provinciasSeleccionadas = Array.from(document.querySelectorAll('#provinciasContainer input:checked')).map(el => el.name);
+
+                if (provinciasSeleccionadas.length === 0) {
+                    errorBlock.textContent = "Debes seleccionar al menos una provincia.";
+                    errorBlock.classList.remove('hidden');
+                    document.getElementById('resultsBlock').classList.add('hidden');
+                    return;
+                }
+
+                const competidoresDirectos = Math.max(0, posicion - vacantes);
+                
+                const pesoProvinciasNoSeleccionadas = Object.keys(PROVINCIAS)
+                    .filter(p => !provinciasSeleccionadas.includes(p))
+                    .reduce((sum, p) => sum + (p.poblacion * p.demandFactor), 0);
+                
+                const ratioFuga = TOTAL_WEIGHTED_DEMAND > 0 ? pesoProvinciasNoSeleccionadas / TOTAL_WEIGHTED_DEMAND : 0;
+                const competidoresFugados = competidoresDirectos * ratioFuga;
+                const competenciaReal = competidoresDirectos - competidoresFugados;
+
+                let selectivityModifier = 1.0;
+                const numProvincias = provinciasSeleccionadas.length;
+                if (numProvincias <= 2) selectivityModifier = 0.85;
+                else if (numProvincias >= 6) selectivityModifier = 1.15;
+
+                const userWeightedDemand = provinciasSeleccionadas.reduce((sum, prov) => sum + (PROVINCIAS[prov].poblacion * PROVINCIAS[prov].demandFactor), 0);
+                let factorProvincial = TOTAL_WEIGHTED_DEMAND > 0 ? userWeightedDemand / TOTAL_WEIGHTED_DEMAND : 0;
+                factorProvincial *= selectivityModifier;
+                
+                const resultado = calcularPronostico(competenciaReal, factorProvincial);
+                actualizarUI(resultado, competidoresDirectos, competenciaReal);
+            }
+
+            function calcularPronostico(posicionRealACompetir, factorProvincial) {
+                if (posicionRealACompetir <= 0) return { tipo: 'verano', mesIndex: -1 };
+
+                let llamamientosAcumulados = 0;
+                for (let i = 0; i < MESES.length; i++) {
+                    const mes = MESES[i];
+                    const llamamientosMesPonderados = LLAMAMIENTOS_MENSUALES[mes] * factorProvincial;
+                    
+                    if (llamamientosAcumulados + llamamientosMesPonderados >= posicionRealACompetir) {
+                        const restante = posicionRealACompetir - llamamientosAcumulados;
+                        const proporcionMes = llamamientosMesPonderados > 0 ? restante / llamamientosMesPonderados : 0;
+                        
+                        const callsInMonth = CALENDARIO_SIPRI.filter(c => c.mes === mes);
+                        if (callsInMonth.length > 0) {
+                            const callIndex = Math.min(Math.floor(proporcionMes * callsInMonth.length), callsInMonth.length - 1);
+                            return { tipo: 'especifico', call: callsInMonth[callIndex], mes: mes, mesIndex: i };
+                        }
+                    }
+                    llamamientosAcumulados += llamamientosMesPonderados;
+                }
+                return { tipo: 'siguiente_curso', mesIndex: MESES.length };
+            }
+
+            function actualizarUI(resultado, posicionEfectiva, competenciaReal) {
+                document.getElementById('resultsBlock').classList.remove('hidden');
+                
+                const resultTextEl = document.getElementById('resultText');
+                switch(resultado.tipo) {
+                    case 'verano':
+                        resultTextEl.innerHTML = '<p class="text-4xl font-bold">¡Adjudicación estimada en Verano!</p><p class="text-sm mt-2 opacity-90">Tu posición, tras las vacantes de agosto, te sitúa en una posición de adjudicación directa.</p>';
+                        break;
+                    case 'siguiente_curso':
+                        resultTextEl.innerHTML = `<p class="text-3xl font-bold">No se estima llamada este curso.</p><p class="text-sm mt-2 opacity-90">Tu competencia real estimada (${Math.round(competenciaReal)} personas) supera los llamamientos previstos para tus provincias.</p>`;
+                        break;
+                    case 'especifico':
+                        const call = resultado.call;
+                        resultTextEl.innerHTML = `
+                            <p class="text-3xl font-bold">Llamamiento estimado: <strong>${call.dia}</strong></p>
+                            <div class="mt-2 text-xl">
+                                <p>Incorporación prevista: <strong>${call.incorporacion}</strong></p>
+                            </div>
+                            <p class="text-xs mt-3 opacity-80">Cálculo basado en una competencia real de ${Math.round(competenciaReal)} personas para tus provincias.</p>
+                        `;
+                        break;
+                }
+
+                if (!cumulativeChart) createCharts();
+                
+                const avanceGeneralAcumulado = MESES.reduce((acc, mes) => {
+                    acc.push((acc.length > 0 ? acc[acc.length - 1] : 0) + LLAMAMIENTOS_MENSUALES[mes]);
+                    return acc;
+                }, []);
+
+                cumulativeChart.data.datasets = [
+                    { label: 'Avance General Estimado', data: avanceGeneralAcumulado, borderColor: '#7851A9', backgroundColor: 'rgba(120, 81, 169, 0.1)', fill: true, tension: 0.2 },
+                    { label: 'Tu Posición Efectiva', data: new Array(MESES.length).fill(posicionEfectiva > 0 ? posicionEfectiva : null), borderColor: '#3A005C', borderDash: [5, 5], pointRadius: 0 }
+                ];
+                cumulativeChart.update();
+
+                monthlyCallsChart.data.datasets = [{
+                    label: 'Llamamientos Mensuales',
+                    data: Object.values(LLAMAMIENTOS_MENSUALES),
+                    backgroundColor: MESES.map((_, index) => index === resultado.mesIndex ? '#5A008A' : '#C187C1'),
+                    borderRadius: 6
+                }];
+                monthlyCallsChart.update();
+            }
+
+            setupProvincias();
+            
+            const bolsaPosInput = document.getElementById('bolsaPos');
+            const vacantesAgostoInput = document.getElementById('vacantesAgosto');
+            const calculateButton = document.getElementById('calculateBtn');
+            
+            bolsaPosInput.addEventListener('input', runCalculation);
+            vacantesAgostoInput.addEventListener('input', runCalculation);
+            calculateButton.addEventListener('click', runCalculation);
+            document.querySelectorAll('#provinciasContainer input[type="checkbox"]').forEach(checkbox => checkbox.addEventListener('change', runCalculation));
+            
+            runCalculation();
+        });
+    </script>
+</body>
+</html>
